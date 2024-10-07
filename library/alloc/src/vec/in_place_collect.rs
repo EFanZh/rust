@@ -160,7 +160,7 @@ use core::iter::{InPlaceIterable, SourceIter, TrustedRandomAccessNoCoerce};
 use core::marker::PhantomData;
 use core::mem::{self, ManuallyDrop, SizedTypeProperties};
 use core::num::NonZero;
-use core::ptr;
+use core::{intrinsics, ptr};
 
 use super::{InPlaceDrop, InPlaceDstDataSrcBufDrop, SpecFromIter, SpecFromIterNested, Vec};
 use crate::alloc::{Global, handle_alloc_error};
@@ -263,6 +263,8 @@ where
             inner.cap.unchecked_mul(mem::size_of::<I::Src>()) / mem::size_of::<T>(),
         )
     };
+
+    unsafe { intrinsics::assume(dst_cap <= T::MAX_SLICE_LEN) };
 
     // SAFETY: `dst_buf` and `dst_end` are the start and end of the buffer.
     let len = unsafe {
