@@ -9,7 +9,11 @@ fn main() {
     let x = 1;
     // Should flatten to println!("a 123 b {x} xyz\n"):
     {
-        ::std::io::_print(format_arguments::new_v1(&["a 123 b ", " xyz\n"],
-                &[format_argument::new_display(&x)]));
+        ::std::io::_print(format_arguments::new(&match (&x,) {
+                            args =>
+                                [format_argument::from_ref(format_arguments::vtable_builder().prepend_write_str().prepend_offset_literal_ptr::<1isize>().prepend_fmt_display(args.0).prepend_offset_argument_ptr::<1isize>().prepend_write_str().finish()),
+                                        format_argument::from_str_array(&["a 123 b ", " xyz\n"]),
+                                        format_argument::from_ref(args.0)],
+                        }, unsafe { format_unsafe_arg::new() }));
     };
 }

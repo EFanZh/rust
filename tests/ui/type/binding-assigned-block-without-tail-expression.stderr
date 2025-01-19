@@ -12,6 +12,17 @@ LL |     println!("{}", x);
    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `()` doesn't implement `std::fmt::Display`
+  --> $DIR/binding-assigned-block-without-tail-expression.rs:14:5
+   |
+LL |     println!("{}", x);
+   |     ^^^^^^^^^^^^^^^^^ `()` cannot be formatted with the default formatter
+   |
+   = help: the trait `std::fmt::Display` is not implemented for `()`
+   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = help: the trait `core::fmt::rt::FmtOp` is implemented for `core::fmt::rt::OffsetArgumentPtr<N, R>`
+   = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `()` doesn't implement `std::fmt::Display`
   --> $DIR/binding-assigned-block-without-tail-expression.rs:15:20
    |
 LL |     let y = {};
@@ -22,6 +33,17 @@ LL |     println!("{}", y);
    |
    = help: the trait `std::fmt::Display` is not implemented for `()`
    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `()` doesn't implement `std::fmt::Display`
+  --> $DIR/binding-assigned-block-without-tail-expression.rs:15:5
+   |
+LL |     println!("{}", y);
+   |     ^^^^^^^^^^^^^^^^^ `()` cannot be formatted with the default formatter
+   |
+   = help: the trait `std::fmt::Display` is not implemented for `()`
+   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = help: the trait `core::fmt::rt::FmtOp` is implemented for `core::fmt::rt::OffsetArgumentPtr<N, R>`
    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `()` doesn't implement `std::fmt::Display`
@@ -38,6 +60,17 @@ LL |     println!("{}", z);
    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `()` doesn't implement `std::fmt::Display`
+  --> $DIR/binding-assigned-block-without-tail-expression.rs:16:5
+   |
+LL |     println!("{}", z);
+   |     ^^^^^^^^^^^^^^^^^ `()` cannot be formatted with the default formatter
+   |
+   = help: the trait `std::fmt::Display` is not implemented for `()`
+   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = help: the trait `core::fmt::rt::FmtOp` is implemented for `core::fmt::rt::OffsetArgumentPtr<N, R>`
+   = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `()` doesn't implement `std::fmt::Display`
   --> $DIR/binding-assigned-block-without-tail-expression.rs:17:20
    |
 LL |       let s = {
@@ -51,6 +84,17 @@ LL |       println!("{}", s);
    |
    = help: the trait `std::fmt::Display` is not implemented for `()`
    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `()` doesn't implement `std::fmt::Display`
+  --> $DIR/binding-assigned-block-without-tail-expression.rs:17:5
+   |
+LL |     println!("{}", s);
+   |     ^^^^^^^^^^^^^^^^^ `()` cannot be formatted with the default formatter
+   |
+   = help: the trait `std::fmt::Display` is not implemented for `()`
+   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+   = help: the trait `core::fmt::rt::FmtOp` is implemented for `core::fmt::rt::OffsetArgumentPtr<N, R>`
    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: mismatched types
@@ -103,7 +147,7 @@ LL |       let _: i32 = s;
    |              |
    |              expected due to this
 
-error: aborting due to 8 previous errors
+error: aborting due to 12 previous errors
 
 Some errors have detailed explanations: E0277, E0308.
 For more information about an error, try `rustc --explain E0277`.

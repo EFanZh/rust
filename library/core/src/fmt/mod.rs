@@ -7,7 +7,11 @@ use crate::char::EscapeDebugExtArgs;
 use crate::marker::PhantomData;
 use crate::num::fmt as numfmt;
 use crate::ops::Deref;
-use crate::{iter, mem, result, str};
+#[cfg(not(bootstrap))]
+use crate::ptr::NonNull;
+#[cfg(not(bootstrap))]
+use crate::slice;
+use crate::{iter, result, str};
 
 mod builders;
 #[cfg(not(no_fp_fmt_parse))]
@@ -33,6 +37,7 @@ pub enum Alignment {
     Center,
 }
 
+#[cfg(bootstrap)]
 #[doc(hidden)]
 #[unstable(feature = "fmt_internals", reason = "internal to standard library", issue = "none")]
 impl From<rt::Alignment> for Option<Alignment> {
@@ -568,6 +573,7 @@ impl<'a> Formatter<'a> {
 /// ```
 ///
 /// [`format()`]: ../../std/fmt/fn.format.html
+#[cfg(bootstrap)]
 #[lang = "format_arguments"]
 #[stable(feature = "rust1", since = "1.0.0")]
 #[derive(Copy, Clone)]
@@ -584,6 +590,7 @@ pub struct Arguments<'a> {
 }
 
 /// Used by the format_args!() macro to create a fmt::Arguments object.
+#[cfg(bootstrap)]
 #[doc(hidden)]
 #[unstable(feature = "fmt_internals", issue = "none")]
 impl<'a> Arguments<'a> {
@@ -645,6 +652,7 @@ impl<'a> Arguments<'a> {
     }
 }
 
+#[cfg(bootstrap)]
 impl<'a> Arguments<'a> {
     /// Gets the formatted string, if it has no arguments to be formatted at runtime.
     ///
@@ -697,6 +705,183 @@ impl<'a> Arguments<'a> {
             ([], []) => Some(""),
             ([s], []) => Some(s),
             _ => None,
+        }
+    }
+
+    /// Same as [`Arguments::as_str`], but will only return `Some(s)` if it can be determined at compile time.
+    #[must_use]
+    #[inline]
+    fn as_statically_known_str(&self) -> Option<&'static str> {
+        let s = self.as_str();
+        if core::intrinsics::is_val_statically_known(s.is_some()) { s } else { None }
+    }
+}
+
+/// This structure represents a safely precompiled version of a format string
+/// and its arguments. This cannot be generated at runtime because it cannot
+/// safely be done, so no constructors are given and the fields are private
+/// to prevent modification.
+///
+/// The [`format_args!`] macro will safely create an instance of this structure.
+/// The macro validates the format string at compile-time so usage of the
+/// [`write()`] and [`format()`] functions can be safely performed.
+///
+/// You can use the `Arguments<'a>` that [`format_args!`] returns in `Debug`
+/// and `Display` contexts as seen below. The example also shows that `Debug`
+/// and `Display` format to the same thing: the interpolated format string
+/// in `format_args!`.
+///
+/// ```rust
+/// let debug = format!("{:?}", format_args!("{} foo {:?}", 1, 2));
+/// let display = format!("{}", format_args!("{} foo {:?}", 1, 2));
+/// assert_eq!("1 foo 2", display);
+/// assert_eq!(display, debug);
+/// ```
+///
+/// [`format()`]: ../../std/fmt/fn.format.html
+#[cfg(not(bootstrap))]
+#[lang = "format_arguments"]
+#[stable(feature = "rust1", since = "1.0.0")]
+#[derive(Copy, Clone)]
+pub struct Arguments<'a> {
+    // Either points to an `rt::Argument<'a>` array, or points to a `u8` array.
+    ptr: NonNull<rt::Argument<'a>>,
+
+    // Invariant:
+    //
+    // - If `maybe_string_length == usize::MAX`, this object is constructed with `Arguments::new`,
+    //   which means `ptr` points to an `rt::Argument<'a>` array.
+    // - Otherwise, this object is constructed with `Arguments::from_static_str`, which means `ptr`
+    //   points to a `u8` array that contains valid UTF-8 string data, and `maybe_string_length`
+    //   specifies the length of the string.
+    maybe_string_length: usize,
+}
+
+/// Used by the format_args!() macro to create a fmt::Arguments object.
+#[cfg(not(bootstrap))]
+#[doc(hidden)]
+#[unstable(feature = "fmt_internals", issue = "none")]
+impl<'a> Arguments<'a> {
+    /// Creates an `Arguments` object.
+    ///
+    /// An `rt::UnsafeArg` is required because the following invariants must be held
+    /// in order for this function to be safe:
+    ///
+    /// - The `args[0]` should be a pointer that points to a `rt::ArgumentsVTable` vtable object.
+    /// - The rest of the elements in `args` should satisfy the memory access requirement of the
+    ///   vtable.
+    #[inline]
+    pub const fn new(args: &'a [rt::Argument<'a>], _unsafe_arg: rt::UnsafeArg) -> Self {
+        Self { ptr: NonNull::from_ref(args).cast(), maybe_string_length: usize::MAX }
+    }
+
+    #[inline]
+    pub const fn from_static_str(string: &'static str) -> Self {
+        Self { ptr: NonNull::from_ref(string).cast(), maybe_string_length: string.len() }
+    }
+
+    /// Used by `format_args` when all arguments are gone after inlining,
+    /// when using `from_static_str` would incorrectly allow for a bigger lifetime.
+    ///
+    /// This fails without format argument inlining, and that shouldn't be different
+    /// when the argument is inlined:
+    ///
+    /// ```compile_fail,E0716
+    /// let f = format_args!("{}", "a");
+    /// println!("{f}");
+    /// ```
+    #[inline]
+    pub const fn from_static_str_with_lifetime(string: &'static str, _lifetime: &'a ()) -> Self {
+        Self::from_static_str(string)
+    }
+
+    /// Estimates the length of the formatted text.
+    ///
+    /// This is intended to be used for setting initial `String` capacity
+    /// when using `format!`. Note: this is neither the lower nor upper bound.
+    #[inline]
+    pub fn estimated_capacity(&self) -> usize {
+        let Self { ptr, maybe_string_length } = *self;
+
+        if maybe_string_length == usize::MAX {
+            // SAFETY: Guaranteed by the invariant of `Arguments`.
+            unsafe {
+                let vtable = ptr.as_ref().as_ref::<rt::ArgumentsVTable>();
+
+                (vtable.estimated_capacity)(ptr.add(1))
+            }
+        } else {
+            maybe_string_length
+        }
+    }
+
+    #[inline(always)]
+    pub const fn vtable_builder() -> rt::ArgumentsVTableBuilder<rt::End> {
+        rt::ArgumentsVTableBuilder::INSTANCE
+    }
+}
+
+#[cfg(not(bootstrap))]
+impl<'a> Arguments<'a> {
+    /// Gets the formatted string, if it has no arguments to be formatted at runtime.
+    ///
+    /// This can be used to avoid allocations in some cases.
+    ///
+    /// # Guarantees
+    ///
+    /// For `format_args!("just a literal")`, this function is guaranteed to
+    /// return `Some("just a literal")`.
+    ///
+    /// For most cases with placeholders, this function will return `None`.
+    ///
+    /// However, the compiler may perform optimizations that can cause this
+    /// function to return `Some(_)` even if the format string contains
+    /// placeholders. For example, `format_args!("Hello, {}!", "world")` may be
+    /// optimized to `format_args!("Hello, world!")`, such that `as_str()`
+    /// returns `Some("Hello, world!")`.
+    ///
+    /// The behavior for anything but the trivial case (without placeholders)
+    /// is not guaranteed, and should not be relied upon for anything other
+    /// than optimization.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::fmt::Arguments;
+    ///
+    /// fn write_str(_: &str) { /* ... */ }
+    ///
+    /// fn write_fmt(args: &Arguments<'_>) {
+    ///     if let Some(s) = args.as_str() {
+    ///         write_str(s)
+    ///     } else {
+    ///         write_str(&args.to_string());
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// ```rust
+    /// assert_eq!(format_args!("hello").as_str(), Some("hello"));
+    /// assert_eq!(format_args!("").as_str(), Some(""));
+    /// assert_eq!(format_args!("{:?}", std::env::current_dir()).as_str(), None);
+    /// ```
+    #[stable(feature = "fmt_as_str", since = "1.52.0")]
+    #[rustc_const_stable(feature = "const_arguments_as_str", since = "1.84.0")]
+    #[must_use]
+    #[inline]
+    pub const fn as_str(&self) -> Option<&'static str> {
+        let Self { ptr, maybe_string_length } = *self;
+
+        if maybe_string_length == usize::MAX {
+            None
+        } else {
+            // SAFETY: Guaranteed by the invariant of `Arguments`.
+            Some(unsafe {
+                str::from_utf8_unchecked(slice::from_raw_parts(
+                    ptr.as_ptr().cast(),
+                    maybe_string_length,
+                ))
+            })
         }
     }
 
@@ -1418,6 +1603,7 @@ pub trait UpperExp {
 /// ```
 ///
 /// [`write!`]: crate::write!
+#[cfg(bootstrap)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn write(output: &mut dyn Write, args: Arguments<'_>) -> Result {
     let mut formatter = Formatter::new(output, FormattingOptions::new());
@@ -1468,6 +1654,7 @@ pub fn write(output: &mut dyn Write, args: Arguments<'_>) -> Result {
     Ok(())
 }
 
+#[cfg(bootstrap)]
 unsafe fn run(fmt: &mut Formatter<'_>, arg: &rt::Placeholder, args: &[rt::Argument<'_>]) -> Result {
     fmt.options.fill = arg.fill;
     fmt.options.align = arg.align.into();
@@ -1490,6 +1677,7 @@ unsafe fn run(fmt: &mut Formatter<'_>, arg: &rt::Placeholder, args: &[rt::Argume
     unsafe { value.fmt(fmt) }
 }
 
+#[cfg(bootstrap)]
 unsafe fn getcount(args: &[rt::Argument<'_>], cnt: &rt::Count) -> Option<usize> {
     match *cnt {
         rt::Count::Is(n) => Some(n),
@@ -1500,6 +1688,64 @@ unsafe fn getcount(args: &[rt::Argument<'_>], cnt: &rt::Count) -> Option<usize> 
             // which guarantees this index is always within bounds.
             unsafe { args.get_unchecked(i).as_usize() }
         }
+    }
+}
+
+/// Takes an output stream and an `Arguments` struct that can be precompiled with
+/// the `format_args!` macro.
+///
+/// The arguments will be formatted according to the specified format string
+/// into the output stream provided.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```
+/// use std::fmt;
+///
+/// let mut output = String::new();
+/// fmt::write(&mut output, format_args!("Hello {}!", "world"))
+///     .expect("Error occurred while trying to write in String");
+/// assert_eq!(output, "Hello world!");
+/// ```
+///
+/// Please note that using [`write!`] might be preferable. Example:
+///
+/// ```
+/// use std::fmt::Write;
+///
+/// let mut output = String::new();
+/// write!(&mut output, "Hello {}!", "world")
+///     .expect("Error occurred while trying to write in String");
+/// assert_eq!(output, "Hello world!");
+/// ```
+///
+/// [`write!`]: crate::write!
+#[cfg(not(bootstrap))]
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn write(output: &mut dyn Write, args: Arguments<'_>) -> Result {
+    let Arguments { ptr, maybe_string_length } = args;
+
+    if maybe_string_length == usize::MAX {
+        let mut formatter = Formatter::new(output, FormattingOptions::new());
+
+        // SAFETY: Guaranteed by the invariant of `Arguments`.
+        unsafe {
+            let vtable = ptr.as_ref().as_ref::<rt::ArgumentsVTable>();
+
+            (vtable.fmt)(ptr.add(1), &mut formatter)
+        }
+    } else {
+        // SAFETY: Guaranteed by the invariant of `Arguments`.
+        let literal = unsafe {
+            str::from_utf8_unchecked(slice::from_raw_parts(
+                ptr.as_ptr().cast(),
+                maybe_string_length,
+            ))
+        };
+
+        output.write_str(literal)
     }
 }
 
