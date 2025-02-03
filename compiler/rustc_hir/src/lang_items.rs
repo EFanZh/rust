@@ -321,11 +321,11 @@ language_item_table! {
     BeginPanic,              sym::begin_panic,         begin_panic_fn,             Target::Fn,             GenericRequirement::None;
 
     // Lang items needed for `format_args!()`.
-    FormatAlignment,         sym::format_alignment,    format_alignment,           Target::Enum,           GenericRequirement::None;
     FormatArgument,          sym::format_argument,     format_argument,            Target::Struct,         GenericRequirement::None;
+    FormatArgumentChecker,   sym::format_argument_checker, format_argument_checker, Target::Struct,        GenericRequirement::None;
     FormatArguments,         sym::format_arguments,    format_arguments,           Target::Struct,         GenericRequirement::None;
-    FormatCount,             sym::format_count,        format_count,               Target::Enum,           GenericRequirement::None;
-    FormatPlaceholder,       sym::format_placeholder,  format_placeholder,         Target::Struct,         GenericRequirement::None;
+    FormatCompileTimeData,   sym::format_compile_time_data, format_compile_time_data, Target::Struct,      GenericRequirement::Exact(1);
+    FormatFmtFnBuilder,      sym::format_fmt_fn_builder, format_fmt_fn_builder,    Target::Struct,         GenericRequirement::Exact(1);
     FormatUnsafeArg,         sym::format_unsafe_arg,   format_unsafe_arg,          Target::Struct,         GenericRequirement::None;
 
     ExchangeMalloc,          sym::exchange_malloc,     exchange_malloc_fn,         Target::Fn,             GenericRequirement::None;

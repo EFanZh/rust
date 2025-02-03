@@ -2229,19 +2229,6 @@ impl<'hir> LoweringContext<'_, 'hir> {
         self.expr(b.span, hir::ExprKind::Block(b, None))
     }
 
-    pub(super) fn expr_array_ref(
-        &mut self,
-        span: Span,
-        elements: &'hir [hir::Expr<'hir>],
-    ) -> hir::Expr<'hir> {
-        let addrof = hir::ExprKind::AddrOf(
-            hir::BorrowKind::Ref,
-            hir::Mutability::Not,
-            self.arena.alloc(self.expr(span, hir::ExprKind::Array(elements))),
-        );
-        self.expr(span, addrof)
-    }
-
     pub(super) fn expr(&mut self, span: Span, kind: hir::ExprKind<'hir>) -> hir::Expr<'hir> {
         let hir_id = self.next_id();
         hir::Expr { hir_id, kind, span: self.lower_span(span) }

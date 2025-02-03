@@ -137,10 +137,10 @@ LL |     println!("{:p}", &std::env::var::<String>);
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^ help: cast `var` to obtain a function pointer: `var::<String> as fn(_) -> _`
 
 warning: taking a reference to a function item does not give a function pointer
-  --> $DIR/function-item-references.rs:127:32
+  --> $DIR/function-item-references.rs:127:44
    |
 LL |     println!("{:p} {:p} {:p}", &nop, &foo, &bar);
-   |                                ^^^^ help: cast `nop` to obtain a function pointer: `nop as fn()`
+   |                                            ^^^^ help: cast `bar` to obtain a function pointer: `bar as fn(_) -> _`
 
 warning: taking a reference to a function item does not give a function pointer
   --> $DIR/function-item-references.rs:127:38
@@ -149,10 +149,10 @@ LL |     println!("{:p} {:p} {:p}", &nop, &foo, &bar);
    |                                      ^^^^ help: cast `foo` to obtain a function pointer: `foo as fn() -> _`
 
 warning: taking a reference to a function item does not give a function pointer
-  --> $DIR/function-item-references.rs:127:44
+  --> $DIR/function-item-references.rs:127:32
    |
 LL |     println!("{:p} {:p} {:p}", &nop, &foo, &bar);
-   |                                            ^^^^ help: cast `bar` to obtain a function pointer: `bar as fn(_) -> _`
+   |                                ^^^^ help: cast `nop` to obtain a function pointer: `nop as fn()`
 
 warning: taking a reference to a function item does not give a function pointer
   --> $DIR/function-item-references.rs:142:41

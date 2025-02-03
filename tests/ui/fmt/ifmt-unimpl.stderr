@@ -17,10 +17,23 @@ LL |     format!("{:X}", "3");
              i32
            and 9 others
    = note: required for `&str` to implement `UpperHex`
-note: required by a bound in `core::fmt::rt::Argument::<'_>::new_upper_hex`
+note: required by a bound in `core::fmt::rt::ArgumentChecker::assert_upper_hex`
   --> $SRC_DIR/core/src/fmt/rt.rs:LL:COL
    = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `format` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: aborting due to 1 previous error
+error[E0277]: the trait bound `core::fmt::rt::FmtUpperHex<&str, core::fmt::rt::End>: core::fmt::rt::FmtOp` is not satisfied
+  --> $DIR/ifmt-unimpl.rs:2:5
+   |
+LL |     format!("{:X}", "3");
+   |     ^^^^^^^^^^^^^^^^^^^^ the trait `core::fmt::rt::FmtOp` is not implemented for `core::fmt::rt::FmtUpperHex<&str, core::fmt::rt::End>`
+   |
+   = help: the following other types implement trait `core::fmt::rt::FmtOp`:
+             core::fmt::rt::FmtUpperHex<T, F>
+             core::fmt::rt::FmtUpperHex<T, core::fmt::rt::End>
+note: required by a bound in `core::fmt::rt::FmtFnBuilder::<F>::build`
+  --> $SRC_DIR/core/src/fmt/rt.rs:LL:COL
+   = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `format` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 2 previous errors
 
 For more information about this error, try `rustc --explain E0277`.
