@@ -17,10 +17,25 @@ LL |         println!("{:?}", foo);
    |                   required by a bound introduced by this call
    |
    = help: the trait `Sized` is not implemented for `dyn Foo`
-note: required by an implicit `Sized` bound in `core::fmt::rt::Argument::<'_>::new_debug`
+note: required by an implicit `Sized` bound in `core::fmt::rt::ArgumentChecker::assert_debug`
   --> $SRC_DIR/core/src/fmt/rt.rs:LL:COL
    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: aborting due to 2 previous errors
+error[E0277]: the size for values of type `dyn Foo` cannot be known at compilation time
+  --> $DIR/issue-111932.rs:5:9
+   |
+LL |         println!("{:?}", foo);
+   |         ^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `dyn Foo`
+   = help: the following other types implement trait `core::fmt::rt::FmtOp`:
+             core::fmt::rt::FmtDebug<T, F>
+             core::fmt::rt::FmtDebug<T, core::fmt::rt::End>
+   = note: required for `core::fmt::rt::FmtDebug<dyn Foo, core::fmt::rt::WriteStr<core::fmt::rt::End>>` to implement `core::fmt::rt::FmtOp`
+note: required by a bound in `core::fmt::rt::FmtFnBuilder::<F>::build`
+  --> $SRC_DIR/core/src/fmt/rt.rs:LL:COL
+   = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 3 previous errors
 
 For more information about this error, try `rustc --explain E0277`.

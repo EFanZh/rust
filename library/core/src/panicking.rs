@@ -125,6 +125,7 @@ pub const fn panic_nounwind_fmt(fmt: fmt::Arguments<'_>, force_no_backtrace: boo
 /// The underlying implementation of core's `panic!` macro when no formatting is used.
 // Never inline unless panic_immediate_abort to avoid code
 // bloat at the call sites as much as possible.
+#[cfg(bootstrap)]
 #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[track_caller]
@@ -145,6 +146,30 @@ pub const fn panic(expr: &'static str) -> ! {
     panic_fmt(fmt::Arguments::new_const(&[expr]));
 }
 
+/// The underlying implementation of core's `panic!` macro when no formatting is used.
+// Never inline unless panic_immediate_abort to avoid code
+// bloat at the call sites as much as possible.
+#[cfg(not(bootstrap))]
+#[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
+#[cfg_attr(feature = "panic_immediate_abort", inline)]
+#[track_caller]
+#[rustc_const_stable_indirect] // must follow stable const rules since it is exposed to stable
+#[lang = "panic"] // used by lints and miri for panics
+pub const fn panic(expr: &'static str) -> ! {
+    // Use Arguments::from_static_str instead of format_args!("{expr}") to potentially
+    // reduce size overhead. The format_args! macro uses str's Display trait to
+    // write expr, which calls Formatter::pad, which must accommodate string
+    // truncation and padding (even though none is used here). Using
+    // Arguments::from_static_str may allow the compiler to omit Formatter::pad from the
+    // output binary, saving up to a few kilobytes.
+    // However, this optimization only works for `'static` strings: `from_static_str` also makes
+    // this message return `Some` from `Arguments::as_str`, which means it can become part of the
+    // panic payload without any allocation or copying. Shorter-lived strings would become invalid
+    // as stack frames get popped during unwinding, and couldn't be directly referenced from the
+    // payload.
+    panic_fmt(fmt::Arguments::from_static_str(expr));
+}
+
 // We generate functions for usage by compiler-generated assertions.
 //
 // Placing these functions in libcore means that all Rust programs can generate a jump into this
@@ -153,6 +178,7 @@ pub const fn panic(expr: &'static str) -> ! {
 //
 // This is especially important when this code is called often (e.g., with -Coverflow-checks) for
 // reducing binary size impact.
+#[cfg(bootstrap)]
 macro_rules! panic_const {
     ($($lang:ident = $message:expr,)+) => {
         pub mod panic_const {
@@ -176,6 +202,44 @@ macro_rules! panic_const {
                     // Arguments::new_const may allow the compiler to omit Formatter::pad from the
                     // output binary, saving up to a few kilobytes.
                     panic_fmt(fmt::Arguments::new_const(&[$message]));
+                }
+            )+
+        }
+    }
+}
+
+// We generate functions for usage by compiler-generated assertions.
+//
+// Placing these functions in libcore means that all Rust programs can generate a jump into this
+// code rather than expanding to panic("...") above, which adds extra bloat to call sites (for the
+// constant string argument's pointer and length).
+//
+// This is especially important when this code is called often (e.g., with -Coverflow-checks) for
+// reducing binary size impact.
+#[cfg(not(bootstrap))]
+macro_rules! panic_const {
+    ($($lang:ident = $message:expr,)+) => {
+        pub mod panic_const {
+            use super::*;
+
+            $(
+                /// This is a panic called with a message that's a result of a MIR-produced Assert.
+                //
+                // never inline unless panic_immediate_abort to avoid code
+                // bloat at the call sites as much as possible
+                #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
+                #[cfg_attr(feature = "panic_immediate_abort", inline)]
+                #[track_caller]
+                #[rustc_const_stable_indirect] // must follow stable const rules since it is exposed to stable
+                #[lang = stringify!($lang)]
+                pub const fn $lang() -> ! {
+                    // Use Arguments::from_static_str instead of format_args!("{expr}") to potentially
+                    // reduce size overhead. The format_args! macro uses str's Display trait to
+                    // write expr, which calls Formatter::pad, which must accommodate string
+                    // truncation and padding (even though none is used here). Using
+                    // Arguments::from_static_str may allow the compiler to omit Formatter::pad from the
+                    // output binary, saving up to a few kilobytes.
+                    panic_fmt(fmt::Arguments::from_static_str($message));
                 }
             )+
         }
@@ -209,6 +273,7 @@ panic_const! {
 
 /// Like `panic`, but without unwinding and track_caller to reduce the impact on codesize on the caller.
 /// If you want `#[track_caller]` for nicer errors, call `panic_nounwind_fmt` directly.
+#[cfg(bootstrap)]
 #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[lang = "panic_nounwind"] // needed by codegen for non-unwinding panics
@@ -219,11 +284,33 @@ pub const fn panic_nounwind(expr: &'static str) -> ! {
 }
 
 /// Like `panic_nounwind`, but also inhibits showing a backtrace.
+#[cfg(bootstrap)]
 #[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
 #[cfg_attr(feature = "panic_immediate_abort", inline)]
 #[rustc_nounwind]
 pub fn panic_nounwind_nobacktrace(expr: &'static str) -> ! {
     panic_nounwind_fmt(fmt::Arguments::new_const(&[expr]), /* force_no_backtrace */ true);
+}
+
+/// Like `panic`, but without unwinding and track_caller to reduce the impact on codesize on the caller.
+/// If you want `#[track_caller]` for nicer errors, call `panic_nounwind_fmt` directly.
+#[cfg(not(bootstrap))]
+#[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
+#[cfg_attr(feature = "panic_immediate_abort", inline)]
+#[lang = "panic_nounwind"] // needed by codegen for non-unwinding panics
+#[rustc_nounwind]
+#[rustc_const_stable_indirect] // must follow stable const rules since it is exposed to stable
+pub const fn panic_nounwind(expr: &'static str) -> ! {
+    panic_nounwind_fmt(fmt::Arguments::from_static_str(expr), /* force_no_backtrace */ false);
+}
+
+/// Like `panic_nounwind`, but also inhibits showing a backtrace.
+#[cfg(not(bootstrap))]
+#[cfg_attr(not(feature = "panic_immediate_abort"), inline(never), cold)]
+#[cfg_attr(feature = "panic_immediate_abort", inline)]
+#[rustc_nounwind]
+pub fn panic_nounwind_nobacktrace(expr: &'static str) -> ! {
+    panic_nounwind_fmt(fmt::Arguments::from_static_str(expr), /* force_no_backtrace */ true);
 }
 
 #[track_caller]
