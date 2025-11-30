@@ -826,7 +826,7 @@ where
     T: ?Sized,
 {
     fn as_ref(&self) -> &T {
-        unsafe { self.weak.as_ptr().as_ref() }
+        self.as_ref()
     }
 }
 
